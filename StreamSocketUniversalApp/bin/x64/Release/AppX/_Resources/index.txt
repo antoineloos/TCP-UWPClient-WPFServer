@@ -1,0 +1,2 @@
+Prism, Version=6.2.0.0, Culture=neutral, PublicKeyToken=91a96d2a154366d8
+  Prism.Properties.Resources.resources

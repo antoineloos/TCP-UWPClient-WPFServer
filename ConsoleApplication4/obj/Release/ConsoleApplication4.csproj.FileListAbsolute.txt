@@ -1,0 +1,6 @@
+C:\Users\antoi\Desktop\StreamSocketUniversalApp\ConsoleApplication4\bin\Release\ConsoleApplication4.exe.config
+C:\Users\antoi\Desktop\StreamSocketUniversalApp\ConsoleApplication4\bin\Release\ConsoleApplication4.exe
+C:\Users\antoi\Desktop\StreamSocketUniversalApp\ConsoleApplication4\bin\Release\ConsoleApplication4.pdb
+C:\Users\antoi\Desktop\StreamSocketUniversalApp\ConsoleApplication4\obj\Release\ConsoleApplication4.exe
+C:\Users\antoi\Desktop\StreamSocketUniversalApp\ConsoleApplication4\obj\Release\ConsoleApplication4.pdb
+C:\Users\antoi\Desktop\StreamSocketUniversalApp\ConsoleApplication4\obj\Release\ConsoleApplication4.csprojResolveAssemblyReference.cache

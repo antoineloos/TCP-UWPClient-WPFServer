@@ -1,5 +1,6 @@
 ﻿using Prism.Commands;
 using Prism.Mvvm;
+using StreamSocketUniversalApp.Utils;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -8,7 +9,10 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Networking;
+using Windows.Networking.Sockets;
 using Windows.Storage;
+using Windows.UI.Xaml;
 
 namespace StreamSocketUniversalApp.ViewModels
 {
@@ -19,6 +23,7 @@ namespace StreamSocketUniversalApp.ViewModels
         private static readonly MainWindowViewModel instance = new MainWindowViewModel();
 
         private BackgroundWorker bgw;
+        
 
         public static MainWindowViewModel Instance
         {
@@ -40,6 +45,13 @@ namespace StreamSocketUniversalApp.ViewModels
         {
             get { return adresse; }
             set { SetProperty(ref adresse, value); }
+        }
+
+        private string connexionStatus;
+        public string ConnexionStatus
+        {
+            get { return connexionStatus; }
+            set { SetProperty(ref connexionStatus, value); }
         }
 
         private ObservableCollection<SocketClient> lstSocketClt;
@@ -69,9 +81,11 @@ namespace StreamSocketUniversalApp.ViewModels
             OpenCommand = new DelegateCommand<SocketClient>(OpenFunc);
             bgw = new BackgroundWorker();
             bgw.DoWork += Bgw_DoWork;
-
+           
             
         }
+
+        
 
         private async void Bgw_DoWork(object sender, DoWorkEventArgs e)
         {

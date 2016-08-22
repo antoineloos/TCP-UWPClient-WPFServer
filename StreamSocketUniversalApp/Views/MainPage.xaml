@@ -16,6 +16,10 @@
                 <TextBlock   TextWrapping="Wrap" Text="Port:" VerticalAlignment="Center" Margin="5"/>
                 <TextBox Text="{Binding Port, Mode=TwoWay}"  TextWrapping="Wrap"  VerticalAlignment="Center" Width="150" Height="40"/>
             </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <TextBlock Text="Etat de la connexion : "/>
+                <TextBlock Text="{Binding ConnectionStatus}"/>
+            </StackPanel>
             <ListBox ItemsSource="{Binding LstSocketClt}" ScrollViewer.VerticalScrollBarVisibility="Auto" HorizontalAlignment="Center" VerticalAlignment="Stretch" Margin="20" MinWidth="1200">
                 <ListBox.ItemTemplate>
                     <DataTemplate>

@@ -1,18 +1,13 @@
 ﻿using Prism.Commands;
 using Prism.Mvvm;
-using StreamSocketUniversalApp.Utils;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Windows.Networking;
-using Windows.Networking.Sockets;
 using Windows.Storage;
-using Windows.UI.Xaml;
+using Windows.Storage.Streams;
 
 namespace StreamSocketUniversalApp.ViewModels
 {
@@ -72,6 +67,7 @@ namespace StreamSocketUniversalApp.ViewModels
         {
             Port = "5555";
             Adresse = "10.0.0.2";
+            //Adresse = "127.0.0.1";
             LstSocketClt = new ObservableCollection<SocketClient>();
             ConnectCommand = new DelegateCommand<SocketClient>(ConnectFunc);
             SendCommand = new DelegateCommand<SocketClient>(SendFunc);
@@ -81,31 +77,32 @@ namespace StreamSocketUniversalApp.ViewModels
             OpenCommand = new DelegateCommand<SocketClient>(OpenFunc);
             bgw = new BackgroundWorker();
             bgw.DoWork += Bgw_DoWork;
-           
-            
         }
-
         
-
-        private async void Bgw_DoWork(object sender, DoWorkEventArgs e)
+        private void Bgw_DoWork(object sender, DoWorkEventArgs e)
         {
             var lstFiles = ((Tuple<IReadOnlyList<StorageFile>, SocketClient>)e.Argument).Item1;
             var client = ((Tuple<IReadOnlyList<StorageFile>, SocketClient>)e.Argument).Item2;
 
-            foreach (StorageFile elem in lstFiles.Where(f => f.FileType == ".json" || f.FileType == ".JSON"))
-            {
-                
-                string result = "";
-                result += await FileIO.ReadTextAsync(elem);
+            //for (int i = 0; i < lstFiles.Count; i++)
+            //{
+            //    client.Send(lstFiles[i]);
+            //}
 
-                client.Send("FileName:" + elem.DisplayName + "\n");
-                foreach(string line in result.Split('\n'))
-                {
-                    client.Send(line+"\n");
-                }
-                client.Send("EndFile\n");
-               
-            }
+            client.Send(lstFiles[0]);
+
+            //foreach (StorageFile elem in lstFiles.Where(f => f.FileType == ".json" || f.FileType == ".JSON"))
+            //{
+            //    string result = "";
+            //    result += await FileIO.ReadTextAsync(elem, UnicodeEncoding.Utf8);
+
+            //    client.Send("FileName:" + elem.DisplayName + "\n");
+            //    foreach (string line in result.Split('\n'))
+            //    {
+            //        client.Send(line + "\n");
+            //    }
+            //    client.Send("EndFile\n");
+            //}
         }
 
         public async Task<StorageFolder> OpenDlgFolder()

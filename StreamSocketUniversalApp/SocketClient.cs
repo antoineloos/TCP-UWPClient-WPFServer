@@ -1,30 +1,30 @@
 ﻿using Prism.Mvvm;
 using StreamSocketUniversalApp.Utils;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
+using Windows.ApplicationModel.Core;
 using Windows.Networking;
 using Windows.Networking.Sockets;
+using Windows.Storage;
 using Windows.Storage.Streams;
-using Windows.UI.Xaml;
+using Windows.UI.Core;
 
 namespace StreamSocketUniversalApp
 {
     public sealed class SocketClient : BindableBase
     {
+        const int BUFFER_SIZE = 4096;
 
-        
+        const string OPEN = "[open]";
+        const string EXIT = "[exit]";
+        const string PUSH = "[push]";
+        const string LIST = "[list]";
+        const string PULL = "[pull]";
+        const string ACK = "[ack]";
 
-        private readonly string _ip;
-        private readonly int _port;
         private StreamSocket _socket;
         private BackgroundWorker bgw;
         private DataWriter _writer;
@@ -64,15 +64,15 @@ namespace StreamSocketUniversalApp
             set { SetProperty(ref isConnected, value); }
         }
 
-        public string Ip { get { return _ip; } }
-        public int Port { get { return _port; } }
+        public string Ip { get; }
+        public int Port { get; }
 
         public SocketClient(string ip, int port)
         {
-            _ip = ip;
-            _port = port;
+            Ip = ip;
+            Port = port;
             rnd = new Random();
-            NumClt = "Client "+rnd.Next(1000, 9000).ToString();
+            NumClt = "Client " + rnd.Next(1000, 9000).ToString();
             Message = "";
             Received = "";
             bgw = new BackgroundWorker();
@@ -85,83 +85,61 @@ namespace StreamSocketUniversalApp
         private async void Bgw_DoWork(object sender, DoWorkEventArgs e)
         {
             DataReader reader;
-           
-            using (reader = new DataReader(_socket.InputStream))
+
+            using (reader = new DataReader(_socket.InputStream) { InputStreamOptions = InputStreamOptions.Partial, ByteOrder = ByteOrder.LittleEndian, UnicodeEncoding = UnicodeEncoding.Utf8 })
             {
-                
-
-
-
-                    
-                   
-                    string result = "";
+                string result = "";
                 bool IsFile = false;
-                reader.InputStreamOptions = Windows.Storage.Streams.InputStreamOptions.Partial;
-               // reader.UnicodeEncoding = Windows.Storage.Streams.UnicodeEncoding.Utf8;
-                    reader.ByteOrder = Windows.Storage.Streams.ByteOrder.LittleEndian;
-                    try
+                // reader.UnicodeEncoding = Windows.Storage.Streams.UnicodeEncoding.Utf8;
+                try
+                {
+                    while (IsConnected)
                     {
-                        while (IsConnected)
+                        await reader.LoadAsync(BUFFER_SIZE);
+                        while (reader.UnconsumedBufferLength > 0 && IsConnected)
                         {
+                            result = reader.ReadString(reader.UnconsumedBufferLength);
 
+                            //if (result.Contains("[")) { IsFile = true; result = ""; }
+                            //if (result.Contains("]")) IsFile = false;
+                            //if (IsFile)
+                            //{
+                            //    var folder = await Windows.Storage.ApplicationData.Current.LocalFolder.GetFolderAsync("InputDB");
+                            //    var file = await folder.CreateFileAsync("1User" + ".json", Windows.Storage.CreationCollisionOption.ReplaceExisting);
+                            //    var data = await file.OpenStreamForWriteAsync();
 
-
-                            await reader.LoadAsync(2);
-                            while (reader.UnconsumedBufferLength > 0 && IsConnected)
-                            {
-                                result += reader.ReadString(reader.UnconsumedBufferLength);
-
-                                await reader.LoadAsync(2);
-                            
-                            if (result.Contains("[")) { IsFile = true; result = ""; }
-                            if (result.Contains("]")) IsFile = false;
-                            if (IsFile)
-                            {
-                                var folder = await Windows.Storage.ApplicationData.Current.LocalFolder.GetFolderAsync("InputDB");
-                                var file = await folder.CreateFileAsync("1User" + ".json", Windows.Storage.CreationCollisionOption.ReplaceExisting);
-                                var data = await file.OpenStreamForWriteAsync();
-
-                                using (var r = new StreamWriter(data))
-                                {
-                                    r.Write("[\n"+result+"\n]");
-                                }
-                            }
-                            else
-                            {
-                                await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+                            //    using (var r = new StreamWriter(data))
+                            //    {
+                            //        r.Write("[\n" + result + "\n]");
+                            //    }
+                            //}
+                            //else
+                            //{
+                                await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                                 {
                                     Received = result;
-
                                 });
-                            }    
+                            //}
 
-                            }
-                            
-                            reader.DetachStream();
-                            if (Received.Contains("Exit")) IsConnected = false;
-
-
+                            await reader.LoadAsync(BUFFER_SIZE);
                         }
-                    }
-                    catch(Exception ex)
-                    {
-                        MessageBox.Show(ex.ToString());
-                    }
-                    finally
-                    {
-                       
+
                         reader.DetachStream();
-                        reader.Dispose();
-                    }  
-                    
-
-
-
-
+                        if (Received.Contains("Exit")) IsConnected = false;
+                    }
                 }
-               
-            
-           
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.ToString());
+                }
+
+                // Nico : Done by using(..) statement
+                //finally
+                //{
+                //    reader.DetachStream();
+                //    reader.Dispose();
+                //}
+            }
         }
 
         public async void CreateInputDbFolder()
@@ -181,50 +159,66 @@ namespace StreamSocketUniversalApp
                 await _socket.ConnectAsync(hostName, Port.ToString());
                 _writer = new DataWriter(_socket.OutputStream);
                 Read();
-                Send("Start\n");
+                Send(OPEN);
             }
             catch (Exception ex)
             {
-                if (OnError != null)
-                    OnError(ex.Message);
+                OnError?.Invoke(ex.Message);
             }
+        }
+        /// <summary>
+        /// Protocole PUSH
+        /// Envoi d'un fichier en binaire
+        /// </summary>
+        /// <param name="file"></param>
+        public async void Send(StorageFile file)
+        {
+            // Envoi du Message
+            Send(PUSH);
+
+            // Envoi du nom du fichier
+            Send(file.Name);
+
+            var buffer = await FileIO.ReadBufferAsync(file);
+            // Envoi de la taille du fichier
+            Send($"{buffer.Length}");
+
+            // Envoi du fichier
+            _writer.WriteBuffer(buffer);
+            await _writer.StoreAsync();
+            await _writer.FlushAsync();
         }
 
         public async void Send(string message)
         {
-            _writer.WriteString(message);
+            // WARNING : Use NewLine to send message PROTOCOLE
+            _writer.WriteString($"{message}{Environment.NewLine}");
 
             try
             {
-
                 await _writer.StoreAsync();
-
                 await _writer.FlushAsync();
             }
             catch (Exception ex)
             {
-                if (OnError != null)
-                    OnError(ex.Message);
+                OnError?.Invoke(ex.Message);
             }
         }
 
         public async void Send()
         {
-           
-            _writer.WriteString(Message+"\n");
-            
-            try
-            {
-                
-                await _writer.StoreAsync();
-                
-                await _writer.FlushAsync();
-            }
-            catch (Exception ex)
-            {
-                if (OnError != null)
-                    OnError(ex.Message);
-            }
+            await Task.Run(() => Send(Message));
+            //_writer.WriteString(Message + "\n");
+
+            //try
+            //{
+            //    await _writer.StoreAsync();
+            //    await _writer.FlushAsync();
+            //}
+            //catch (Exception ex)
+            //{
+            //    OnError?.Invoke(ex.Message);
+            //}
         }
 
         private void Read()
@@ -238,20 +232,18 @@ namespace StreamSocketUniversalApp
             {
                 IsConnected = false;
                 IsAlive = false;
-                Message = "exit\n";
-                this.Send();
+
+                Send(EXIT);
+
                 _writer.DetachStream();
                 _writer.Dispose();
 
-
                 _socket.Dispose();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Debug.WriteLine(ex.ToString());
             }
-            
-            
         }
     }
 }

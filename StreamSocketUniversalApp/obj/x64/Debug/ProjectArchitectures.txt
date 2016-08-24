@@ -1,0 +1,1 @@
+C:\Users\nlepinay\Source\Repos\TCP-UWPClient-WPFServer\StreamSocketUniversalApp\StreamSocketUniversalApp.csproj;x64

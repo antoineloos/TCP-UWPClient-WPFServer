@@ -1,11 +1,14 @@
 ﻿using Prism.Mvvm;
 using StreamSocketUniversalApp.Utils;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
+using Windows.Foundation;
 using Windows.Networking;
 using Windows.Networking.Sockets;
 using Windows.Storage;
@@ -27,7 +30,7 @@ namespace StreamSocketUniversalApp
 
         private StreamSocket _socket;
         private BackgroundWorker bgw;
-        private DataWriter _writer;
+        //private DataWriter _writer;
         private Random rnd;
         public bool IsAlive;
 
@@ -84,9 +87,7 @@ namespace StreamSocketUniversalApp
 
         private async void Bgw_DoWork(object sender, DoWorkEventArgs e)
         {
-            DataReader reader;
-
-            using (reader = new DataReader(_socket.InputStream) { InputStreamOptions = InputStreamOptions.Partial, ByteOrder = ByteOrder.LittleEndian, UnicodeEncoding = UnicodeEncoding.Utf8 })
+            using (DataReader reader = new DataReader(_socket.InputStream) { InputStreamOptions = InputStreamOptions.Partial, ByteOrder = ByteOrder.LittleEndian, UnicodeEncoding = UnicodeEncoding.Utf8 })
             {
                 string result = "";
                 bool IsFile = false;
@@ -157,7 +158,7 @@ namespace StreamSocketUniversalApp
                 var hostName = new HostName(Ip);
                 _socket = new StreamSocket();
                 await _socket.ConnectAsync(hostName, Port.ToString());
-                _writer = new DataWriter(_socket.OutputStream);
+                //_writer = new DataWriter(_socket.OutputStream);
                 Read();
                 Send(OPEN);
             }
@@ -179,25 +180,46 @@ namespace StreamSocketUniversalApp
             // Envoi du nom du fichier
             Send(file.Name);
 
-            var buffer = await FileIO.ReadBufferAsync(file);
-            // Envoi de la taille du fichier
-            Send($"{buffer.Length}");
+            //var buffer = await FileIO.ReadBufferAsync(file);
+            //// Envoi de la taille du fichier
+            //Send($"{buffer.Length}");
 
-            // Envoi du fichier
-            _writer.WriteBuffer(buffer);
-            await _writer.StoreAsync();
-            await _writer.FlushAsync();
+            //// Envoi du fichier
+            //_writer.WriteBuffer(buffer);
+            //await _writer.StoreAsync();
+            //await _writer.FlushAsync();
+
+            // Envoi de la taille du fichier
+            var fileProp = await file.GetBasicPropertiesAsync();
+            Send($"{fileProp.Size}");
+
+            int readCount = 0;
+            ulong readTotal = 0;
+            byte[] buffer = new byte[BUFFER_SIZE];
+            var pendingWrites = new List<IAsyncOperationWithProgress<uint, uint>>();
+
+            var readStream = await file.OpenStreamForReadAsync();
+            var outputStream = _socket.OutputStream;
+            while (readTotal < fileProp.Size)
+            {
+                readTotal += (ulong)(readCount = readStream.Read(buffer, 0, BUFFER_SIZE));
+                pendingWrites.Add( outputStream.WriteAsync(buffer.AsBuffer(0, readCount)) );
+            }
+            await outputStream.FlushAsync();
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                Received = $"Sent [{readTotal}] {Received}";
+            });
         }
 
         public async void Send(string message)
         {
-            // WARNING : Use NewLine to send message PROTOCOLE
-            _writer.WriteString($"{message}{Environment.NewLine}");
-
             try
             {
-                await _writer.StoreAsync();
-                await _writer.FlushAsync();
+                StreamWriter writer = new StreamWriter(_socket.OutputStream.AsStreamForWrite());
+            
+                await writer.WriteLineAsync(message);
+                await writer.FlushAsync();
             }
             catch (Exception ex)
             {
@@ -235,8 +257,8 @@ namespace StreamSocketUniversalApp
 
                 Send(EXIT);
 
-                _writer.DetachStream();
-                _writer.Dispose();
+                //_writer.DetachStream();
+                //_writer.Dispose();
 
                 _socket.Dispose();
             }

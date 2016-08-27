@@ -140,7 +140,7 @@ namespace StreamSocketUniversalApp.ViewModels
         {
             foreach(SocketClient elem in LstSocketClt)
             {
-                elem.Close();
+                CloseFunc(elem);
             }
         }
 

@@ -67,20 +67,18 @@ namespace ConsoleApplication4
                                 var filename = sReader.ReadLine();
                                 Acquittement(filename, sWriter, rnd);
                                 // Read size name
-                                var filesize = sReader.ReadLine();
+                                var filesize = Convert.ToUInt64(sReader.ReadLine());
                                 Acquittement($"Expected: {filesize} bytes", sWriter, rnd);
                                 // Read socket stream and write file stream
                                 using (var fs = new FileStream(Path.Combine(RecieveFolder, filename), FileMode.Create))
                                 {
                                     var buffer = new byte[BUFFER_SIZE];
-                                    var readCount = sReader.BaseStream.Read(buffer, 0, BUFFER_SIZE);
-                                    var readTotal = readCount;
-                                    while (readCount > 0)
+                                    int readCount = 0;
+                                    ulong readTotal = 0;
+                                    while (readTotal < filesize)
                                     {
+                                        readTotal += (ulong)(readCount = sReader.BaseStream.Read(buffer, 0, BUFFER_SIZE));
                                         fs.Write(buffer, 0, readCount);
-                                        // Break condition suspicious but following read don't stop loop
-                                        if (readCount < BUFFER_SIZE) break;
-                                        readTotal += (readCount = sReader.BaseStream.Read(buffer, 0, BUFFER_SIZE));
                                     }
                                     Acquittement($"Recieved: {readTotal} bytes", sWriter, rnd);
                                 }

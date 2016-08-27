@@ -66,8 +66,8 @@ namespace StreamSocketUniversalApp.ViewModels
         private MainWindowViewModel()
         {
             Port = "5555";
-            Adresse = "10.0.0.2";
-            //Adresse = "127.0.0.1";
+            //Adresse = "10.0.0.2";
+            Adresse = "127.0.0.1";
             LstSocketClt = new ObservableCollection<SocketClient>();
             ConnectCommand = new DelegateCommand<SocketClient>(ConnectFunc);
             SendCommand = new DelegateCommand<SocketClient>(SendFunc);

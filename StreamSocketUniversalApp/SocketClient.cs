@@ -179,16 +179,7 @@ namespace StreamSocketUniversalApp
 
             // Envoi du nom du fichier
             Send(file.Name);
-
-            //var buffer = await FileIO.ReadBufferAsync(file);
-            //// Envoi de la taille du fichier
-            //Send($"{buffer.Length}");
-
-            //// Envoi du fichier
-            //_writer.WriteBuffer(buffer);
-            //await _writer.StoreAsync();
-            //await _writer.FlushAsync();
-
+            
             // Envoi de la taille du fichier
             var fileProp = await file.GetBasicPropertiesAsync();
             Send($"{fileProp.Size}");
@@ -198,14 +189,16 @@ namespace StreamSocketUniversalApp
             byte[] buffer = new byte[BUFFER_SIZE];
             var pendingWrites = new List<IAsyncOperationWithProgress<uint, uint>>();
 
-            var readStream = await file.OpenStreamForReadAsync();
-            var outputStream = _socket.OutputStream;
-            while (readTotal < fileProp.Size)
+            using (var readStream = await file.OpenStreamForReadAsync())
             {
-                readTotal += (ulong)(readCount = readStream.Read(buffer, 0, BUFFER_SIZE));
-                pendingWrites.Add( outputStream.WriteAsync(buffer.AsBuffer(0, readCount)) );
+                var outputStream = _socket.OutputStream;
+                while (readTotal < fileProp.Size)
+                {
+                    readTotal += (ulong)(readCount = readStream.Read(buffer, 0, BUFFER_SIZE));
+                    pendingWrites.Add(outputStream.WriteAsync(buffer.AsBuffer(0, readCount)));
+                }
+                await outputStream.FlushAsync();
             }
-            await outputStream.FlushAsync();
             await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
                 Received = $"Sent [{readTotal}] {Received}";

@@ -7,26 +7,16 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Windows.Storage;
+using Windows.Storage.AccessCache;
 using Windows.Storage.Streams;
 
 namespace StreamSocketUniversalApp.ViewModels
 {
     public class MainWindowViewModel : BindableBase
     {
-
-
         private static readonly MainWindowViewModel instance = new MainWindowViewModel();
 
-        private BackgroundWorker bgw;
-        
-
-        public static MainWindowViewModel Instance
-        {
-            get
-            {
-                return instance;
-            }
-        }
+        public static MainWindowViewModel Instance => instance;
 
         private string port;
         public string Port
@@ -75,32 +65,6 @@ namespace StreamSocketUniversalApp.ViewModels
             AddCltCommand = new DelegateCommand(AddCltFunc);
             DeleteCommand = new DelegateCommand<SocketClient>(DeleteFunc);
             OpenCommand = new DelegateCommand<SocketClient>(OpenFunc);
-            bgw = new BackgroundWorker();
-            bgw.DoWork += Bgw_DoWork;
-        }
-        
-        private void Bgw_DoWork(object sender, DoWorkEventArgs e)
-        {
-            var lstFiles = ((Tuple<IReadOnlyList<StorageFile>, SocketClient>)e.Argument).Item1;
-            var client = ((Tuple<IReadOnlyList<StorageFile>, SocketClient>)e.Argument).Item2;
-
-            for (int i = 0; i < lstFiles.Count; i++)
-            {
-                client.Send(lstFiles[i]).Wait();
-            }
-
-            //foreach (StorageFile elem in lstFiles.Where(f => f.FileType == ".json" || f.FileType == ".JSON"))
-            //{
-            //    string result = "";
-            //    result += await FileIO.ReadTextAsync(elem, UnicodeEncoding.Utf8);
-
-            //    client.Send("FileName:" + elem.DisplayName + "\n");
-            //    foreach (string line in result.Split('\n'))
-            //    {
-            //        client.Send(line + "\n");
-            //    }
-            //    client.Send("EndFile\n");
-            //}
         }
 
         public async Task<StorageFolder> OpenDlgFolder()
@@ -114,10 +78,8 @@ namespace StreamSocketUniversalApp.ViewModels
             if (folder != null)
             {
 
-                Windows.Storage.AccessCache.StorageApplicationPermissions.FutureAccessList.AddOrReplace("PickedFolderToken", folder);
-
+                StorageApplicationPermissions.FutureAccessList.AddOrReplace("PickedFolderToken", folder);
                 return folder;
-
             }
             else
             {
@@ -129,9 +91,26 @@ namespace StreamSocketUniversalApp.ViewModels
         private async void OpenFunc(SocketClient client)
         {
             var folder = await OpenDlgFolder();
+            if (folder == null) return;
+
+            await SendFiles(folder, client);
+        }
+        
+        private async Task SendFiles(StorageFolder folder, SocketClient client)
+        {
             var lstFiles = await folder.GetFilesAsync();
-            bgw.RunWorkerAsync(new Tuple<IReadOnlyList<StorageFile>,SocketClient>( lstFiles, client));
-            
+            await Task.Factory.StartNew(() =>
+            {
+                foreach (var file in lstFiles)
+                {
+                    client.Send(file).Wait();
+                }
+
+                //for (int i = 0; i < lstFiles.Count; i++)
+                //{
+                //    client.Send(lstFiles[i]).Wait();
+                //}
+            });
         }
 
         public void CloseAllClt()

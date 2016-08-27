@@ -172,7 +172,7 @@ namespace StreamSocketUniversalApp
         /// Envoi d'un fichier en binaire
         /// </summary>
         /// <param name="file"></param>
-        public async void Send(StorageFile file)
+        public async Task Send(StorageFile file)
         {
             // Envoi du Message
             Send(PUSH);

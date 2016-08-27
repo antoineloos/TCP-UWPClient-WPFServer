@@ -84,12 +84,10 @@ namespace StreamSocketUniversalApp.ViewModels
             var lstFiles = ((Tuple<IReadOnlyList<StorageFile>, SocketClient>)e.Argument).Item1;
             var client = ((Tuple<IReadOnlyList<StorageFile>, SocketClient>)e.Argument).Item2;
 
-            //for (int i = 0; i < lstFiles.Count; i++)
-            //{
-            //    client.Send(lstFiles[i]);
-            //}
-
-            client.Send(lstFiles[0]);
+            for (int i = 0; i < lstFiles.Count; i++)
+            {
+                client.Send(lstFiles[i]).Wait();
+            }
 
             //foreach (StorageFile elem in lstFiles.Where(f => f.FileType == ".json" || f.FileType == ".JSON"))
             //{

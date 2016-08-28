@@ -95,8 +95,8 @@ namespace StreamSocketUniversalApp.ViewModels
             var folder = await OpenDlgFolder();
             if (folder == null) return;
 
-            await Task.Factory.StartNew(() => SendFiles(client, folder));
-            //await SendRepository(client, folder);
+            //await Task.Factory.StartNew(() => SendFiles(client, folder));
+            await SendRepository(client, folder);
         }
 
         private async Task<List<Tuple<StorageFolder, string>>> GetRepository(StorageFolder folder, string path = "")

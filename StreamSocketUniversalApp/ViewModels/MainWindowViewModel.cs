@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Windows.Storage;
 using Windows.Storage.AccessCache;
@@ -51,7 +53,7 @@ namespace StreamSocketUniversalApp.ViewModels
         public DelegateCommand<SocketClient> CloseCommand { get; private set; }
         public DelegateCommand AddCltCommand { get; private set; }
         public DelegateCommand<SocketClient> DeleteCommand { get; private set; }
-        public DelegateCommand<SocketClient> OpenCommand { get; private set; } 
+        public DelegateCommand<SocketClient> OpenCommand { get; private set; }
 
         private MainWindowViewModel()
         {
@@ -93,29 +95,57 @@ namespace StreamSocketUniversalApp.ViewModels
             var folder = await OpenDlgFolder();
             if (folder == null) return;
 
-            await SendFiles(folder, client);
+            await Task.Factory.StartNew(() => SendFiles(client, folder));
+            //await SendRepository(client, folder);
         }
-        
-        private async Task SendFiles(StorageFolder folder, SocketClient client)
+
+        private async Task<List<Tuple<StorageFolder, string>>> GetRepository(StorageFolder folder, string path = "")
+        {
+            var currentFolders = new List<Tuple<StorageFolder, string>>();
+            currentFolders.Add(new Tuple<StorageFolder, string>(folder, path));
+
+            var subFolders = await folder.GetFoldersAsync();
+
+            if (subFolders.Any())
+            {
+                foreach (var subFolder in subFolders)
+                {
+                    currentFolders.AddRange(await GetRepository(
+                        subFolder,
+                        !string.IsNullOrEmpty(path) ?
+                            Path.Combine(path, subFolder.DisplayName) :
+                            subFolder.DisplayName
+                    ));
+                }
+            }
+
+            return currentFolders;
+        }
+
+        private async Task SendRepository(SocketClient client, StorageFolder folder)
+        {
+            await GetRepository(folder)
+                .ContinueWith(async task =>
+                {
+                    foreach (var f in task.Result)
+                    {
+                        await SendFiles(client, f.Item1, f.Item2);
+                    }
+                });
+        }
+
+        private async Task SendFiles(SocketClient client, StorageFolder folder, string path = "")
         {
             var lstFiles = await folder.GetFilesAsync();
-            await Task.Factory.StartNew(() =>
+            foreach (var file in lstFiles)
             {
-                foreach (var file in lstFiles)
-                {
-                    client.Send(file).Wait();
-                }
-
-                //for (int i = 0; i < lstFiles.Count; i++)
-                //{
-                //    client.Send(lstFiles[i]).Wait();
-                //}
-            });
+                await client.Send(file, path);
+            }
         }
 
         public void CloseAllClt()
         {
-            foreach(SocketClient elem in LstSocketClt)
+            foreach (SocketClient elem in LstSocketClt)
             {
                 CloseFunc(elem);
             }
@@ -140,7 +170,7 @@ namespace StreamSocketUniversalApp.ViewModels
             if (client.IsAlive)
             {
                 client.Close();
-            }  
+            }
         }
 
         private void SendFunc(SocketClient client)

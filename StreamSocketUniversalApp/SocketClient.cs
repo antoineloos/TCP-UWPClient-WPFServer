@@ -6,6 +6,8 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
 using Windows.Foundation;
@@ -87,7 +89,7 @@ namespace StreamSocketUniversalApp
 
         private async void Bgw_DoWork(object sender, DoWorkEventArgs e)
         {
-            using (DataReader reader = new DataReader(_socket.InputStream) { InputStreamOptions = InputStreamOptions.Partial, ByteOrder = ByteOrder.LittleEndian, UnicodeEncoding = UnicodeEncoding.Utf8 })
+            using (DataReader reader = new DataReader(_socket.InputStream) { InputStreamOptions = InputStreamOptions.Partial, ByteOrder = ByteOrder.LittleEndian, UnicodeEncoding = Windows.Storage.Streams.UnicodeEncoding.Utf8 })
             {
                 string result = "";
                 bool IsFile = false;
@@ -116,10 +118,10 @@ namespace StreamSocketUniversalApp
                             //}
                             //else
                             //{
-                                await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-                                {
-                                    Received = result;
-                                });
+                            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                            {
+                                Received = result;
+                            });
                             //}
 
                             await reader.LoadAsync(BUFFER_SIZE);
@@ -158,8 +160,8 @@ namespace StreamSocketUniversalApp
                 var hostName = new HostName(Ip);
                 _socket = new StreamSocket();
                 await _socket.ConnectAsync(hostName, Port.ToString());
-                //_writer = new DataWriter(_socket.OutputStream);
-                Read();
+
+                bgw.RunWorkerAsync();
                 Send(OPEN);
             }
             catch (Exception ex)
@@ -172,37 +174,80 @@ namespace StreamSocketUniversalApp
         /// Envoi d'un fichier en binaire
         /// </summary>
         /// <param name="file"></param>
-        public async Task Send(StorageFile file)
+        public async Task Send(StorageFile file, string path = "")
         {
-            // Envoi du Message
-            Send(PUSH);
-
-            // Envoi du nom du fichier
-            Send(file.Name);
-            
-            // Envoi de la taille du fichier
-            var fileProp = await file.GetBasicPropertiesAsync();
-            Send($"{fileProp.Size}");
-
-            int readCount = 0;
-            ulong readTotal = 0;
-            byte[] buffer = new byte[BUFFER_SIZE];
-            var pendingWrites = new List<IAsyncOperationWithProgress<uint, uint>>();
-
-            using (var readStream = await file.OpenStreamForReadAsync())
+            try
             {
-                var outputStream = _socket.OutputStream;
-                while (readTotal < fileProp.Size)
+                // Envoi du Message
+                Send(PUSH);
+
+                var readTotal = SendHandler(new Tuple<StorageFile, string>(file, path)).Result;
+
+                await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
-                    readTotal += (ulong)(readCount = readStream.Read(buffer, 0, BUFFER_SIZE));
-                    pendingWrites.Add(outputStream.WriteAsync(buffer.AsBuffer(0, readCount)));
-                }
-                await outputStream.FlushAsync();
+                    Received = $"Sent [{readTotal}] {Received}";
+                });
             }
-            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            catch (Exception e)
             {
-                Received = $"Sent [{readTotal}] {Received}";
-            });
+                await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                {
+                    Received = $"Error [{file.DisplayName}] {e.Message}";
+                });
+            }
+        }
+
+        private Task<ulong> SendHandler(Tuple<StorageFile, string> state)
+        {
+            return Task.Factory.StartNew(async () =>
+            {
+                StorageFile file = state.Item1;
+                string path = state.Item2;
+
+                try
+                {
+                    var socket = new StreamSocket();
+                    await socket.ConnectAsync(new HostName(Ip), $"{Port + 1}");
+                    var outputStream = socket.OutputStream;
+                    byte[] buffer = new byte[BUFFER_SIZE];
+
+                    // Envoi du nom du fichier et de la taille du fichier
+                    var filename = !string.IsNullOrEmpty(path) ?
+                                    Path.Combine(path, file.Name) :
+                                    file.Name;
+                    var fileProp = await file.GetBasicPropertiesAsync();
+                    var header = $"{filename}|{fileProp.Size}";
+                    var read = Encoding.ASCII.GetBytes(header, 0, header.Length, buffer, 0);
+                    await outputStream.WriteAsync(buffer.AsBuffer(0, read));
+                    await outputStream.FlushAsync();
+
+                    // Envoi
+                    int readCount = 0;
+                    ulong readTotal = 0;
+                    var pendingWrites = new List<IAsyncOperationWithProgress<uint, uint>>();
+
+                    using (var readStream = await file.OpenStreamForReadAsync())
+                    {
+                        while (readTotal < fileProp.Size)
+                        {
+                            readTotal += (ulong)(readCount = readStream.Read(buffer, 0, BUFFER_SIZE));
+                            pendingWrites.Add(outputStream.WriteAsync(buffer.AsBuffer(0, readCount)));
+                        }
+                        await outputStream.FlushAsync();
+                    }
+                    socket.OutputStream.Dispose();
+                    socket.Dispose();
+                    return readTotal;
+                }
+                catch (Exception e)
+                {
+                    await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                    {
+                        Received = $"Error [{file.DisplayName}] {e.Message}";
+                    });
+                    return (ulong)0;
+                }
+            }).Result;
         }
 
         public async void Send(string message)
@@ -210,7 +255,7 @@ namespace StreamSocketUniversalApp
             try
             {
                 StreamWriter writer = new StreamWriter(_socket.OutputStream.AsStreamForWrite());
-            
+
                 await writer.WriteLineAsync(message);
                 await writer.FlushAsync();
             }
@@ -223,22 +268,6 @@ namespace StreamSocketUniversalApp
         public async void Send()
         {
             await Task.Run(() => Send(Message));
-            //_writer.WriteString(Message + "\n");
-
-            //try
-            //{
-            //    await _writer.StoreAsync();
-            //    await _writer.FlushAsync();
-            //}
-            //catch (Exception ex)
-            //{
-            //    OnError?.Invoke(ex.Message);
-            //}
-        }
-
-        private void Read()
-        {
-            bgw.RunWorkerAsync();
         }
 
         public void Close()
@@ -249,9 +278,6 @@ namespace StreamSocketUniversalApp
                 IsAlive = false;
 
                 Send(EXIT);
-
-                //_writer.DetachStream();
-                //_writer.Dispose();
 
                 _socket.Dispose();
             }

@@ -118,7 +118,7 @@ namespace ConsoleApplication4
                 {
                     var buffer = new byte[BUFFER_SIZE];
                     stream.Read(buffer, 0, BUFFER_SIZE);
-                    var header = Encoding.ASCII.GetString(buffer);
+                    var header = Encoding.UTF8.GetString(buffer);
                     var filename = header.Split('|')[0];
                     var filesize = Convert.ToUInt64(header.Split('|')[1]);
 

@@ -31,7 +31,7 @@ namespace StreamSocketUniversalApp
         const string ACK = "[ack]";
 
         private StreamSocket _socket;
-        private BackgroundWorker bgw;
+        //private BackgroundWorker bgw;
         //private DataWriter _writer;
         private Random rnd;
         public bool IsAlive;
@@ -80,14 +80,16 @@ namespace StreamSocketUniversalApp
             NumClt = "Client " + rnd.Next(1000, 9000).ToString();
             Message = "";
             Received = "";
-            bgw = new BackgroundWorker();
-            bgw.DoWork += Bgw_DoWork;
+            //bgw = new BackgroundWorker();
+            //bgw.DoWork += Bgw_DoWork;
 
             CreateInputDbFolder();
         }
 
 
-        private async void Bgw_DoWork(object sender, DoWorkEventArgs e)
+
+        private async void Listen()
+        //private async void Bgw_DoWork(object sender, DoWorkEventArgs e)
         {
             using (DataReader reader = new DataReader(_socket.InputStream) { InputStreamOptions = InputStreamOptions.Partial, ByteOrder = ByteOrder.LittleEndian, UnicodeEncoding = Windows.Storage.Streams.UnicodeEncoding.Utf8 })
             {
@@ -161,7 +163,8 @@ namespace StreamSocketUniversalApp
                 _socket = new StreamSocket();
                 await _socket.ConnectAsync(hostName, Port.ToString());
 
-                bgw.RunWorkerAsync();
+                await Task.Factory.StartNew(Listen);
+                //bgw.RunWorkerAsync();
                 Send(OPEN);
             }
             catch (Exception ex)
@@ -169,6 +172,7 @@ namespace StreamSocketUniversalApp
                 OnError?.Invoke(ex.Message);
             }
         }
+
         /// <summary>
         /// Protocole PUSH
         /// Envoi d'un fichier en binaire
@@ -217,7 +221,7 @@ namespace StreamSocketUniversalApp
                                     file.Name;
                     var fileProp = await file.GetBasicPropertiesAsync();
                     var header = $"{filename}|{fileProp.Size}";
-                    var read = Encoding.ASCII.GetBytes(header, 0, header.Length, buffer, 0);
+                    var read = Encoding.UTF8.GetBytes(header, 0, header.Length, buffer, 0);
                     await outputStream.WriteAsync(buffer.AsBuffer(0, read));
                     await outputStream.FlushAsync();
 

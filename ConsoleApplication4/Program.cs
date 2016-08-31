@@ -22,6 +22,7 @@ namespace ConsoleApplication4
             const string ACK = "[ack]";
 
             static readonly string RecieveFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "outputDir");
+            private static int _nbResponse = 0;
 
             static void Main(string[] args)
             {
@@ -54,18 +55,14 @@ namespace ConsoleApplication4
             }
             private static void ThreadProc(object obj)
             {
-                var client = (TcpClient)obj;
-                Random rnd = new Random();
-                StreamReader sReader = new StreamReader(client.GetStream());
-                StreamWriter sWriter = new StreamWriter(client.GetStream());
-
                 Console.WriteLine("client accepted on the thread " + Thread.CurrentThread.ManagedThreadId.ToString());
+                var client = (TcpClient)obj;
 
                 String data = "";
-                //string result = "";
-                //bool IsFileTransferStarted = false;
-                //string courantFileName = "";
-
+                var socketStream = client.GetStream();
+                StreamReader sReader = new StreamReader(socketStream);
+                StreamWriter sWriter = new StreamWriter(socketStream);
+                
                 try
                 {
                     while ((data = sReader.ReadLine()) != EXIT)
@@ -73,28 +70,39 @@ namespace ConsoleApplication4
                         switch (data)
                         {
                             case OPEN:
-                                Acquittement(data, sWriter, rnd);
+                                //Acquittement(data, sWriter, rnd);
+                                Acquittement(sWriter, data);
                                 break;
                             case PUSH:
                                 // Ack PUSH
-                                Acquittement(data, sWriter, rnd);
+                                //Acquittement(data, sWriter, rnd);
+                                Acquittement(sWriter, data);
                                 break;
                             case LIST:
+                                Acquittement(sWriter, data);
+                                var nbFile = Convert.ToInt32(sReader.ReadLine());
+                                var isAllFilesPushed = true;
+                                for (int i = 0; i < nbFile; i++)
+                                {
+                                    isAllFilesPushed &= File.Exists(Path.Combine(RecieveFolder, sReader.ReadLine()));
+                                }
+                                Acquittement(sWriter, $"{LIST} {(isAllFilesPushed ? "SUCCESS" : "FAILED")}");
                                 break;
                             case PULL:
-                                if (Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\" + "importDir"))
-                                {
-                                    var import = File.ReadAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\importDir\\4Item.json"));
-                                    foreach (string line in import.Split('\n'))
-                                    {
-                                        sWriter.WriteLine(line + "\n");
-                                        sWriter.Flush();
-                                    }
-                                    Console.WriteLine("syncok");
-                                }
+                                //if (Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\" + "importDir"))
+                                //{
+                                //    var import = File.ReadAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\importDir\\4Item.json"));
+                                //    foreach (string line in import.Split('\n'))
+                                //    {
+                                //        sWriter.WriteLine(line + "\n");
+                                //        sWriter.Flush();
+                                //    }
+                                //    Console.WriteLine("syncok");
+                                //}
                                 break;
                             default:
-                                Acquittement($"Unknown data : {data}", sWriter, rnd);
+                                //Acquittement($"Unknown data : {data}", sWriter, rnd);
+                                Acquittement(sWriter, $"Unknown data : {data}");
                                 break;
                         }
                     }
@@ -103,7 +111,8 @@ namespace ConsoleApplication4
                 {
                     //sWriter.WriteLine("OK:Exit\n");
                     //sWriter.Flush();
-                    Acquittement(data, sWriter, rnd);
+                    //Acquittement(data, sWriter, rnd);
+                    Acquittement(sWriter, data);
                     sReader.Close();
                     sWriter.Close();
                     //Console.WriteLine("exit from clt on thread "+ Thread.CurrentThread.ManagedThreadId.ToString());
@@ -113,34 +122,44 @@ namespace ConsoleApplication4
             private static void RecieveFile(object obj)
             {
                 var client = (TcpClient)obj;
-                Log("RecieveFile connection ...");
-                using (var stream = client.GetStream())
+                Log($"{PUSH} RecieveFile connection ...");
+                try
                 {
-                    var buffer = new byte[BUFFER_SIZE];
-                    stream.Read(buffer, 0, BUFFER_SIZE);
-                    var header = Encoding.UTF8.GetString(buffer);
-                    var filename = header.Split('|')[0];
-                    var filesize = Convert.ToUInt64(header.Split('|')[1]);
-
-                    Log($"Recieving {filename}({filesize} bytes)");
-
-                    var fi = new FileInfo(Path.Combine(RecieveFolder, filename));
-                    if (!fi.Directory.Exists)
-                        Directory.CreateDirectory(fi.DirectoryName);
-                    // Read socket stream and write file stream
-                    ulong readTotal = 0;
-                    using (var fs = new FileStream(fi.FullName, FileMode.Create))
+                    using (var stream = client.GetStream())
                     {
-                        int readCount = 0;
-                        while (readTotal < filesize)
+                        var buffer = new byte[BUFFER_SIZE];
+                        stream.Read(buffer, 0, BUFFER_SIZE);
+                        var header = Encoding.UTF8.GetString(buffer);
+                        var filename = header.Split('|')[0];
+                        var filesize = Convert.ToUInt64(header.Split('|')[1]);
+
+                        Log($"{PUSH} Recieving {filename}({filesize} bytes)");
+
+                        var fi = new FileInfo(Path.Combine(RecieveFolder, filename));
+                        if (!fi.Directory.Exists)
+                            Directory.CreateDirectory(fi.DirectoryName);
+                        // Read socket stream and write file stream
+                        ulong readTotal = 0;
+                        using (var fs = new FileStream(fi.FullName, FileMode.Create))
                         {
-                            readTotal += (ulong)(readCount = stream.Read(buffer, 0, BUFFER_SIZE));
-                            fs.Write(buffer, 0, readCount);
+                            int readCount = 0;
+                            while (readTotal < filesize)
+                            {
+                                readTotal += (ulong)(readCount = stream.Read(buffer, 0, BUFFER_SIZE));
+                                fs.Write(buffer, 0, readCount);
+                            }
                         }
+                        Log($"{PUSH} Recieved: {readTotal} bytes");
                     }
-                    Log($"Recieved: {readTotal} bytes");
                 }
-                client.Close();
+                catch(Exception e)
+                {
+                    Log($"{e}");
+                }
+                finally
+                {
+                    client.Close();
+                }
             }
 
             static void Log(string message)
@@ -148,12 +167,19 @@ namespace ConsoleApplication4
                 Console.WriteLine($"[{Thread.CurrentThread.ManagedThreadId}] {message}");
             }
 
-            static void Acquittement(string message, StreamWriter writer, Random rnd)
+            private static void Acquittement(StreamWriter writer, string message)
             {
                 Log(message);
-                writer.WriteLine($"[{rnd.Next(1000, 9000)}] {ACK} {message}");
+                writer.WriteLine($"{ACK}({_nbResponse++}) {message}");
                 writer.Flush();
             }
+
+            //static void Acquittement(string message, StreamWriter writer, Random rnd)
+            //{
+            //    Log(message);
+            //    writer.WriteLine($"[{rnd.Next(1000, 9000)}] {ACK} {message}");
+            //    writer.Flush();
+            //}
         }
     }
 }

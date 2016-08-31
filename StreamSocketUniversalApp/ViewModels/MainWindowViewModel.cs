@@ -96,7 +96,37 @@ namespace StreamSocketUniversalApp.ViewModels
             if (folder == null) return;
 
             //await Task.Factory.StartNew(() => SendFiles(client, folder));
-            await SendRepository(client, folder);
+            //await SendRepository(client, folder);
+
+            client.Push();
+
+            //var folders = await GetRepository(folder);
+            var files = new List<string>();
+            //foreach (var f in folders)
+            foreach (var f in await GetRepository(folder))
+            {
+                //var lstFiles = await f.Item1.GetFilesAsync();
+                //foreach (var file in lstFiles)
+
+                foreach (var file in await f.Item1.GetFilesAsync())
+                {
+                    files.Add(await client.Send(file, f.Item2));
+                }
+            }
+
+            //Task.WaitAll(fileTasks.ToArray());
+
+            //var fileList = Task.Factory.ContinueWhenAll(fileTasks.ToArray(), (tasks) =>
+            //{
+            //    var list = new List<string>();
+            //    foreach (var t in tasks)
+            //    {
+            //        list.Add(t.Result);
+            //    }
+            //    return list;
+            //});
+
+            client.List(files);
         }
 
         private async Task<List<Tuple<StorageFolder, string>>> GetRepository(StorageFolder folder, string path = "")

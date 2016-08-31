@@ -178,36 +178,86 @@ namespace StreamSocketUniversalApp
         /// Envoi d'un fichier en binaire
         /// </summary>
         /// <param name="file"></param>
-        public async Task Send(StorageFile file, string path = "")
-        {
-            try
-            {
-                // Envoi du Message
-                Send(PUSH);
+        //public async Task Send(StorageFile file, string path = "")
+        //{
+        //    try
+        //    {
+        //        // Envoi du Message
+        //        Send(PUSH);
 
-                var readTotal = SendHandler(new Tuple<StorageFile, string>(file, path)).Result;
+        //        var readTotal = SendHandler(new Tuple<StorageFile, string>(file, path)).Result;
 
-                await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-                {
-                    Received = $"Sent [{readTotal}] {Received}";
-                });
-            }
-            catch (Exception e)
-            {
-                await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-                {
-                    Received = $"Error [{file.DisplayName}] {e.Message}";
-                });
-            }
-        }
+        //        await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+        //        {
+        //            Received = $"Sent [{readTotal}] {Received}";
+        //        });
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+        //        {
+        //            Received = $"Error [{file.DisplayName}] {e.Message}";
+        //        });
+        //    }
+        //}
 
-        private Task<ulong> SendHandler(Tuple<StorageFile, string> state)
+        //private Task<ulong> SendHandler(Tuple<StorageFile, string> state)
+        //{
+        //    return Task.Factory.StartNew(async () =>
+        //    {
+        //        StorageFile file = state.Item1;
+        //        string path = state.Item2;
+
+        //        try
+        //        {
+        //            var socket = new StreamSocket();
+        //            await socket.ConnectAsync(new HostName(Ip), $"{Port + 1}");
+        //            var outputStream = socket.OutputStream;
+        //            byte[] buffer = new byte[BUFFER_SIZE];
+
+        //            // Envoi du nom du fichier et de la taille du fichier
+        //            var filename = !string.IsNullOrEmpty(path) ?
+        //                            Path.Combine(path, file.Name) :
+        //                            file.Name;
+        //            var fileProp = await file.GetBasicPropertiesAsync();
+        //            var header = $"{filename}|{fileProp.Size}";
+        //            var read = Encoding.UTF8.GetBytes(header, 0, header.Length, buffer, 0);
+        //            await outputStream.WriteAsync(buffer.AsBuffer(0, read));
+        //            await outputStream.FlushAsync();
+
+        //            // Envoi
+        //            int readCount = 0;
+        //            ulong readTotal = 0;
+        //            var pendingWrites = new List<IAsyncOperationWithProgress<uint, uint>>();
+
+        //            using (var readStream = await file.OpenStreamForReadAsync())
+        //            {
+        //                while (readTotal < fileProp.Size)
+        //                {
+        //                    readTotal += (ulong)(readCount = readStream.Read(buffer, 0, BUFFER_SIZE));
+        //                    pendingWrites.Add(outputStream.WriteAsync(buffer.AsBuffer(0, readCount)));
+        //                }
+        //                await outputStream.FlushAsync();
+        //            }
+        //            socket.OutputStream.Dispose();
+        //            socket.Dispose();
+        //            return readTotal;
+        //        }
+        //        catch (Exception e)
+        //        {
+        //            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+        //            {
+        //                Received = $"Error [{file.DisplayName}] {e.Message}";
+        //            });
+        //            return (ulong)0;
+        //        }
+        //    }).Result;
+        //}
+
+        public Task<string> Send(StorageFile file, string path = "")
         {
             return Task.Factory.StartNew(async () =>
             {
-                StorageFile file = state.Item1;
-                string path = state.Item2;
-
                 try
                 {
                     var socket = new StreamSocket();
@@ -241,7 +291,13 @@ namespace StreamSocketUniversalApp
                     }
                     socket.OutputStream.Dispose();
                     socket.Dispose();
-                    return readTotal;
+
+                    await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                    {
+                        Received = $"Sent [{readTotal}] {Received}";
+                    });
+
+                    return filename;
                 }
                 catch (Exception e)
                 {
@@ -249,7 +305,7 @@ namespace StreamSocketUniversalApp
                     {
                         Received = $"Error [{file.DisplayName}] {e.Message}";
                     });
-                    return (ulong)0;
+                    return "";
                 }
             }).Result;
         }
@@ -272,6 +328,21 @@ namespace StreamSocketUniversalApp
         public async void Send()
         {
             await Task.Run(() => Send(Message));
+        }
+
+        public void Push()
+        {
+            Send(PUSH);
+        }
+
+        public void List(List<string> files)
+        {
+            Send(LIST);
+            Send($"{files.Count}");
+            foreach (var file in files)
+            {
+                Send(file);
+            }
         }
 
         public void Close()

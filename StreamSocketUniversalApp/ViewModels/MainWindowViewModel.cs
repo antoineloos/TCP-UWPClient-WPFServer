@@ -95,38 +95,18 @@ namespace StreamSocketUniversalApp.ViewModels
             var folder = await OpenDlgFolder();
             if (folder == null) return;
 
-            //await Task.Factory.StartNew(() => SendFiles(client, folder));
-            //await SendRepository(client, folder);
-
             client.Push();
-
-            //var folders = await GetRepository(folder);
+            
             var files = new List<string>();
-            //foreach (var f in folders)
             foreach (var f in await GetRepository(folder))
             {
-                //var lstFiles = await f.Item1.GetFilesAsync();
-                //foreach (var file in lstFiles)
-
                 foreach (var file in await f.Item1.GetFilesAsync())
                 {
                     files.Add(await client.Send(file, f.Item2));
                 }
             }
 
-            //Task.WaitAll(fileTasks.ToArray());
-
-            //var fileList = Task.Factory.ContinueWhenAll(fileTasks.ToArray(), (tasks) =>
-            //{
-            //    var list = new List<string>();
-            //    foreach (var t in tasks)
-            //    {
-            //        list.Add(t.Result);
-            //    }
-            //    return list;
-            //});
-
-            client.List(files);
+            client.Control(files);
         }
 
         private async Task<List<Tuple<StorageFolder, string>>> GetRepository(StorageFolder folder, string path = "")
@@ -152,27 +132,7 @@ namespace StreamSocketUniversalApp.ViewModels
             return currentFolders;
         }
 
-        private async Task SendRepository(SocketClient client, StorageFolder folder)
-        {
-            await GetRepository(folder)
-                .ContinueWith(async task =>
-                {
-                    foreach (var f in task.Result)
-                    {
-                        await SendFiles(client, f.Item1, f.Item2);
-                    }
-                });
-        }
-
-        private async Task SendFiles(SocketClient client, StorageFolder folder, string path = "")
-        {
-            var lstFiles = await folder.GetFilesAsync();
-            foreach (var file in lstFiles)
-            {
-                await client.Send(file, path);
-            }
-        }
-
+        #region Exec Cmd
         public void CloseAllClt()
         {
             foreach (SocketClient elem in LstSocketClt)
@@ -183,10 +143,11 @@ namespace StreamSocketUniversalApp.ViewModels
 
         private void DeleteFunc(SocketClient client)
         {
-            if (client.IsAlive)
-            {
+            //if (client.IsAlive)
+            //{
+            //    client.Close();
+            //}
                 client.Close();
-            }
             LstSocketClt.Remove(client);
         }
 
@@ -197,10 +158,10 @@ namespace StreamSocketUniversalApp.ViewModels
 
         private void CloseFunc(SocketClient client)
         {
-            if (client.IsAlive)
-            {
+            //if (client.IsAlive)
+            //{
                 client.Close();
-            }
+            //}
         }
 
         private void SendFunc(SocketClient client)
@@ -211,6 +172,7 @@ namespace StreamSocketUniversalApp.ViewModels
         private void ConnectFunc(SocketClient client)
         {
             client.Connect();
-        }
+        } 
+        #endregion
     }
 }

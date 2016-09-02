@@ -85,12 +85,10 @@ namespace ConsoleApplication4
                         switch (data)
                         {
                             case OPEN:
-                                //Acquittement(data, sWriter, rnd);
                                 Acquittement(sWriter, data);
                                 break;
                             case PUSH:
                                 // Ack PUSH
-                                //Acquittement(data, sWriter, rnd);
                                 Acquittement(sWriter, data);
                                 break;
                             case CTRL:

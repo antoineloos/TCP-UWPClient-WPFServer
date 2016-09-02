@@ -171,27 +171,40 @@ namespace StreamSocketUniversalApp
                     await outputStream.WriteAsync(buffer.AsBuffer(0, read));
                     await outputStream.FlushAsync();
 
-                    // Envoi
-                    FileInfo fi = new FileInfo(Path.Combine(ApplicationData.Current.LocalFolder.Name, filename));
-                    var destFolder = await StorageFolder.GetFolderFromPathAsync(fi.DirectoryName);
-                    var folder = await destFolder.CreateFolderAsync(fi.DirectoryName, CreationCollisionOption.OpenIfExists);
+                    // Creation du répertoire local
+                    FileInfo fi = new FileInfo(Path.Combine(ApplicationData.Current.LocalFolder.Path, filename));
+                    if (fi.DirectoryName != ApplicationData.Current.LocalFolder.Path && !Directory.Exists(fi.DirectoryName))
+                    {
+                        Stack<string> parents = new Stack<string>();
+                        var currentDirectory = fi.Directory;
+                        while (!Directory.Exists(currentDirectory.FullName))
+                        {
+                            parents.Push(currentDirectory.Name);
+                            currentDirectory = currentDirectory.Parent;
+                        }
+                        var currentFolder = await StorageFolder.GetFolderFromPathAsync(currentDirectory.FullName);
+                        while (currentFolder.Path != fi.DirectoryName)
+                        {
+                            currentFolder = await currentFolder.CreateFolderAsync(parents.Pop(), CreationCollisionOption.OpenIfExists);
+                        }
+                    }
+                    var folder = await StorageFolder.GetFolderFromPathAsync(fi.DirectoryName);
                     var file = await folder.CreateFileAsync(fi.Name, CreationCollisionOption.ReplaceExisting);
-                    var data = await file.OpenStreamForWriteAsync();
 
+                    // Envoi
                     int readCount = 0;
                     ulong readTotal = 0;
                     var pendingWrites = new List<IAsyncOperationWithProgress<uint, uint>>();
 
-                    using (var writeSrream = await file.OpenStreamForWriteAsync())
+                    using (var writeStream = await file.OpenStreamForWriteAsync())
                     {
                         using (var readStream = inputStream.AsStreamForRead())
                         {
                             while (readTotal < filesize)
                             {
                                 readTotal += (ulong)(readCount = readStream.Read(buffer, 0, BUFFER_SIZE));
-                                pendingWrites.Add(outputStream.WriteAsync(buffer.AsBuffer(0, readCount)));
+                                writeStream.Write(buffer, 0, readCount);
                             }
-                            //await outputStream.FlushAsync();
                         } 
                     }
                     socket.InputStream.Dispose();

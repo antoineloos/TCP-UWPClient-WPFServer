@@ -70,8 +70,6 @@ namespace StreamSocketUniversalApp
             NumClt = $"Client {new Random().Next(1000, 9000)}";
             Message = "";
             Received = "";
-
-            CreateInputDbFolder();
         }
 
 
@@ -81,7 +79,6 @@ namespace StreamSocketUniversalApp
             using (DataReader reader = new DataReader(_socket.InputStream) { InputStreamOptions = InputStreamOptions.Partial, ByteOrder = ByteOrder.LittleEndian, UnicodeEncoding = Windows.Storage.Streams.UnicodeEncoding.Utf8 })
             {
                 string result = "";
-                List<string> headers = null;
                 StringBuilder headerBuilder = null;
                 try
                 {
@@ -98,7 +95,6 @@ namespace StreamSocketUniversalApp
                         if (result.StartsWith(CTRL))
                         {
                             headerBuilder = new StringBuilder();
-                            headers = new List<string>();
                             Send(LIST);
                         }
 
@@ -110,8 +106,8 @@ namespace StreamSocketUniversalApp
                         if (result.Contains(PULL))
                         {
                             var lists = headerBuilder.Replace("\r\n", "§").ToString().Split('§');
-                            headers.AddRange(lists.Where(h => h.StartsWith(LIST)).Select(h => h.Remove(0, LIST.Length+1)));
-                            headers.ForEach(async (header) => await Receive(header));
+                            var headers = new List<string>(lists.Where(h => h.StartsWith(LIST)).Select(h => h.Remove(0, LIST.Length+1)));
+                            await Task.Run(() => headers.ForEach(async (header) => await Receive(header))).ContinueWith(_ => Send(EXIT));
                         }
 
                         if (result.StartsWith(EXIT))
@@ -125,12 +121,6 @@ namespace StreamSocketUniversalApp
                     MessageBox.Show(ex.ToString());
                 }
             }
-        }
-
-        public async void CreateInputDbFolder()
-        {
-            var folder = ApplicationData.Current.LocalFolder;
-            await folder.CreateFolderAsync("InputDB", CreationCollisionOption.OpenIfExists);
         }
 
         public async void Connect()
